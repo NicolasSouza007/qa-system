@@ -8,15 +8,10 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { FiPlus, FiX, FiUserPlus, FiCheck } from "react-icons/fi";
-
-type Task = {
-  id: string;
-  title: string;
-  column: "today" | "bugs" | "review" | "approved";
-  priority: "high" | "medium" | "low";
-  module: string;
-  assignedTo: string;
-};
+import { useSession } from "next-auth/react";
+import { TaskModal } from "@/app/components/task-modal";
+import { KanbanBoard } from "./kanban-board";
+import type { Task } from "@/app/types/Task";
 
 type User = {
   id: string;
@@ -52,8 +47,9 @@ export function AdminDashboard() {
   const [modalOpen, setModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { data: session } = useSession();
 
-  // estados do convite
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({ name: "", email: "" });
   const [inviteStatus, setInviteStatus] = useState<
@@ -65,11 +61,9 @@ export function AdminDashboard() {
     const unsubTasks = onSnapshot(collection(db, "tasks"), (snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Task));
     });
-
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setUsers(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as User));
     });
-
     return () => {
       unsubTasks();
       unsubUsers();
@@ -80,7 +74,6 @@ export function AdminDashboard() {
 
   async function handleSave() {
     if (!form.title.trim() || !form.module.trim() || !form.assignedTo) return;
-
     setSaving(true);
     await addDoc(collection(db, "tasks"), {
       ...form,
@@ -94,7 +87,6 @@ export function AdminDashboard() {
 
   async function handleInvite() {
     if (!inviteForm.name.trim() || !inviteForm.email.trim()) return;
-
     setInviteStatus("sending");
     setInviteError("");
 
@@ -130,7 +122,7 @@ export function AdminDashboard() {
           <h3 className="text-gray-200 text-sm font-medium mb-4">
             Progresso do time
           </h3>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             {members.map((member) => {
               const memberTasks = tasks.filter(
                 (t) => t.assignedTo === member.id,
@@ -214,63 +206,12 @@ export function AdminDashboard() {
       </div>
 
       {/* Board Kanban */}
-      <div className="grid grid-cols-4 gap-4">
-        {columns.map((col) => {
-          const colTasks = tasks.filter((t) => t.column === col.key);
-          return (
-            <div
-              key={col.key}
-              className="bg-gray-900 rounded-xl border border-gray-400 p-4"
-            >
-              <div className="flex items-center justify-between mb-4">
-                <span className={`text-sm font-medium ${col.color}`}>
-                  {col.label}
-                </span>
-                <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
-                  {colTasks.length}
-                </span>
-              </div>
-
-              {colTasks.length === 0 && (
-                <p className="text-gray-400 text-xs text-center mt-8">
-                  Nenhuma task
-                </p>
-              )}
-
-              {colTasks.map((task) => {
-                const assignee = users.find((u) => u.id === task.assignedTo);
-                return (
-                  <div
-                    key={task.id}
-                    className="bg-gray-800 rounded-lg p-3 mb-2 border border-gray-500 hover:border-gray-600 duration-200"
-                  >
-                    <p className="text-white text-sm font-medium mb-2">
-                      {task.title}
-                    </p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`w-2 h-2 rounded-full ${priorityDot[task.priority]}`}
-                        />
-                        <span className="text-gray-400 text-xs">
-                          {task.module}
-                        </span>
-                      </div>
-                      {assignee && (
-                        <img
-                          src={assignee.photo}
-                          alt={assignee.name}
-                          className="w-5 h-5 rounded-full"
-                        />
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })}
-      </div>
+      <KanbanBoard
+        tasks={tasks}
+        users={users}
+        setTasks={setTasks}
+        onOpenTask={setSelectedTask}
+      />
 
       {/* Modal Nova Task */}
       {modalOpen && (
@@ -509,6 +450,19 @@ export function AdminDashboard() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Modal de detalhes da task */}
+      {selectedTask && session?.user && (
+        <TaskModal
+          task={selectedTask}
+          currentUser={{
+            id: session.user.id,
+            name: session.user.name ?? "Admin",
+            photo: session.user.image ?? "",
+          }}
+          onClose={() => setSelectedTask(null)}
+        />
       )}
     </div>
   );

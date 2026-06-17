@@ -17,7 +17,7 @@ export default async function Dashboard() {
   const role = userDoc.data()?.role ?? "member";
 
   return (
-    <div className="bg-gray-800 min-h-screen px-6 py-8 w-10/12 mx-auto">
+    <div className="bg-gray-800  px-6 py-8 w-10/12 mx-auto">
       <div className="mb-8">
         <h2 className="text-white text-2xl font-bold">
           Olá,{" "}

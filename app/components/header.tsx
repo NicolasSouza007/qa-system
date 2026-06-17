@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 
 export function Header() {
-  const { data: session, status } = useSession(); // <- pega o data também
+  const { data: session, status } = useSession();
 
   async function handleLogin() {
     await signIn("google");
@@ -38,7 +38,7 @@ export function Header() {
 
         {status === "authenticated" && (
           <div className="flex items-center gap-4">
-            {/* Foto e nome do usuário */}
+            {/* foto do usuário e nome */}
             <Link href="/dashboard" className="flex items-center gap-3 group">
               {session?.user?.image ? (
                 <Image
@@ -55,7 +55,7 @@ export function Header() {
                 </div>
               )}
               <span className="text-white text-sm font-medium group-hover:text-sky-300 duration-300">
-                {session?.user?.name?.split(" ")[0]} {/* só o primeiro nome */}
+                {session?.user?.name?.split(" ")[0]}
               </span>
             </Link>
 
