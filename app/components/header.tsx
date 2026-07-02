@@ -1,5 +1,5 @@
 "use client";
-import { FiLogOut, FiLoader, FiLock } from "react-icons/fi";
+import { FiUser, FiPower, FiLoader } from "react-icons/fi";
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
@@ -32,12 +32,20 @@ export function Header() {
 
         {status === "unauthenticated" && (
           <button onClick={handleLogin}>
-            <FiLock size={26} className="text-white" />
+            <FiUser size={26} className="text-white" />
           </button>
         )}
 
         {status === "authenticated" && (
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-6">
+            {/* botão acessar painel — só aparece quando logado */}
+            <Link
+              href="/dashboard"
+              className="px-4 py-2 bg-sky-500 hover:bg-sky-400 text-white text-sm font-semibold rounded-lg duration-200"
+            >
+              Acessar Painel
+            </Link>
+
             {/* foto do usuário e nome */}
             <Link href="/dashboard" className="flex items-center gap-3 group">
               {session?.user?.image ? (
@@ -49,7 +57,6 @@ export function Header() {
                   className="rounded-full ring-2 ring-sky-300"
                 />
               ) : (
-                // fallback com inicial do nome caso não tenha foto
                 <div className="w-9 h-9 rounded-full bg-sky-300 flex items-center justify-center text-black font-bold text-sm">
                   {session?.user?.name?.charAt(0).toUpperCase()}
                 </div>
@@ -60,7 +67,7 @@ export function Header() {
             </Link>
 
             <button onClick={handleLogout}>
-              <FiLogOut
+              <FiPower
                 size={26}
                 className="text-white hover:text-sky-300 duration-300"
               />

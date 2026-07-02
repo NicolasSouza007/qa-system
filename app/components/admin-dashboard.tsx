@@ -487,13 +487,6 @@ export function AdminDashboard({
               const memberTasks = tasks.filter(
                 (t) => t.assignedTo === member.id,
               );
-              const approved = memberTasks.filter(
-                (t) => t.column === "approved",
-              ).length;
-              const pct =
-                memberTasks.length > 0
-                  ? Math.round((approved / memberTasks.length) * 100)
-                  : 0;
               return (
                 <div
                   key={member.id}
@@ -523,28 +516,26 @@ export function AdminDashboard({
                       <FiTrash2 size={14} />
                     </button>
                   </div>
-                  <div className="grid grid-cols-4 gap-1 mb-3">
-                    {columns.slice(0, 4).map((col) => (
-                      <div key={col.key} className="text-center">
-                        <p className="text-white text-sm font-medium">
+
+                  {/* colunas dinâmicas — puxando os nomes reais */}
+                  <div className="flex flex-wrap gap-2">
+                    {columns.map((col) => (
+                      <div
+                        key={col.key}
+                        className="flex-1 min-w-20 text-center bg-gray-800 rounded-lg py-2 px-1"
+                      >
+                        <p className="text-white text-sm font-semibold">
                           {
                             memberTasks.filter((t) => t.column === col.key)
                               .length
                           }
                         </p>
-                        <p className="text-gray-200 text-xs truncate">
+                        <p className="text-gray-400 text-xs truncate">
                           {col.label.split(" ")[0]}
                         </p>
                       </div>
                     ))}
                   </div>
-                  <div className="w-full bg-gray-800 rounded-full h-1.5">
-                    <div
-                      className="bg-green-500 h-1.5 rounded-full"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  <p className="text-gray-200 text-xs mt-1">{pct}% concluído</p>
                 </div>
               );
             })}

@@ -8,6 +8,9 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  doc,
+  deleteDoc,
+  getDocs,
 } from "firebase/firestore";
 import {
   FiX,
@@ -16,6 +19,8 @@ import {
   FiFile,
   FiDownload,
   FiImage,
+  FiTrash2,
+  FiAlertTriangle,
 } from "react-icons/fi";
 
 type Task = {
@@ -81,9 +86,10 @@ export function TaskModal({
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // caminho correto: tasks/{workspaceId}/tasks/{taskId}/comments
   useEffect(() => {
     const q = query(
       collection(db, "tasks", workspaceId, "tasks", task.id, "comments"),
@@ -111,7 +117,6 @@ export function TaskModal({
   async function handleSendComment() {
     if (!commentText.trim()) return;
     setSending(true);
-
     await addDoc(
       collection(db, "tasks", workspaceId, "tasks", task.id, "comments"),
       {
@@ -121,7 +126,6 @@ export function TaskModal({
         createdAt: serverTimestamp(),
       },
     );
-
     setCommentText("");
     setSending(false);
   }
@@ -146,7 +150,6 @@ export function TaskModal({
         method: "POST",
         body: formData,
       });
-
       clearInterval(interval);
       setUploadProgress(100);
 
@@ -168,6 +171,29 @@ export function TaskModal({
       setUploading(false);
       setUploadProgress(0);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function handleDeleteTask() {
+    setDeleting(true);
+    try {
+      const taskRef = doc(db, "tasks", workspaceId, "tasks", task.id);
+
+      // deleta todos os comentários
+      const commentsSnap = await getDocs(collection(taskRef, "comments"));
+      await Promise.all(commentsSnap.docs.map((d) => deleteDoc(d.ref)));
+
+      // deleta todos os anexos
+      const attachmentsSnap = await getDocs(collection(taskRef, "attachments"));
+      await Promise.all(attachmentsSnap.docs.map((d) => deleteDoc(d.ref)));
+
+      // deleta a task
+      await deleteDoc(taskRef);
+
+      onClose();
+    } catch (err) {
+      console.error("Erro ao deletar task:", err);
+      setDeleting(false);
     }
   }
 
@@ -211,12 +237,21 @@ export function TaskModal({
               {task.title}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-white duration-200 shrink-0"
-          >
-            <FiX size={20} />
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="text-gray-600 hover:text-red-400 duration-200"
+              title="Excluir task"
+            >
+              <FiTrash2 size={18} />
+            </button>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-white duration-200"
+            >
+              <FiX size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Conteúdo scrollável */}
@@ -366,6 +401,49 @@ export function TaskModal({
           </div>
         </div>
       </div>
+
+      {/* Modal de confirmação de exclusão */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-60 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm mx-4">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
+                <FiAlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">Excluir task?</h3>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  Esta ação não pode ser desfeita.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-6">
+              <p className="text-red-300 text-xs">
+                Os comentários e os arquivos importados serão apagados
+                permanentemente.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium py-2.5 rounded-lg duration-200 disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleDeleteTask}
+                disabled={deleting}
+                className="flex-1 bg-red-500 hover:bg-red-400 disabled:bg-red-500/50 text-white text-sm font-medium py-2.5 rounded-lg duration-200 disabled:cursor-not-allowed"
+              >
+                {deleting ? "Excluindo..." : "Excluir"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
