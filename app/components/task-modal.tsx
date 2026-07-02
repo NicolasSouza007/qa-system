@@ -66,10 +66,12 @@ const columnLabel: Record<string, string> = {
 
 export function TaskModal({
   task,
+  workspaceId,
   currentUser,
   onClose,
 }: {
   task: Task;
+  workspaceId: string;
   currentUser: { id: string; name: string; photo: string };
   onClose: () => void;
 }) {
@@ -81,20 +83,21 @@ export function TaskModal({
   const [uploadProgress, setUploadProgress] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // caminho correto: tasks/{workspaceId}/tasks/{taskId}/comments
   useEffect(() => {
     const q = query(
-      collection(db, "tasks", task.id, "comments"),
+      collection(db, "tasks", workspaceId, "tasks", task.id, "comments"),
       orderBy("createdAt", "asc"),
     );
     const unsub = onSnapshot(q, (snap) => {
       setComments(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Comment));
     });
     return () => unsub();
-  }, [task.id]);
+  }, [task.id, workspaceId]);
 
   useEffect(() => {
     const q = query(
-      collection(db, "tasks", task.id, "attachments"),
+      collection(db, "tasks", workspaceId, "tasks", task.id, "attachments"),
       orderBy("createdAt", "asc"),
     );
     const unsub = onSnapshot(q, (snap) => {
@@ -103,18 +106,21 @@ export function TaskModal({
       );
     });
     return () => unsub();
-  }, [task.id]);
+  }, [task.id, workspaceId]);
 
   async function handleSendComment() {
     if (!commentText.trim()) return;
     setSending(true);
 
-    await addDoc(collection(db, "tasks", task.id, "comments"), {
-      text: commentText.trim(),
-      authorName: currentUser.name,
-      authorPhoto: currentUser.photo,
-      createdAt: serverTimestamp(),
-    });
+    await addDoc(
+      collection(db, "tasks", workspaceId, "tasks", task.id, "comments"),
+      {
+        text: commentText.trim(),
+        authorName: currentUser.name,
+        authorPhoto: currentUser.photo,
+        createdAt: serverTimestamp(),
+      },
+    );
 
     setCommentText("");
     setSending(false);
@@ -145,15 +151,17 @@ export function TaskModal({
       setUploadProgress(100);
 
       const data = await res.json();
-
       if (!res.ok) throw new Error(data.error);
 
-      await addDoc(collection(db, "tasks", task.id, "attachments"), {
-        name: file.name,
-        url: data.url,
-        type: file.type,
-        createdAt: serverTimestamp(),
-      });
+      await addDoc(
+        collection(db, "tasks", workspaceId, "tasks", task.id, "attachments"),
+        {
+          name: file.name,
+          url: data.url,
+          type: file.type,
+          createdAt: serverTimestamp(),
+        },
+      );
     } catch (err) {
       console.error("Erro no upload:", err);
     } finally {
