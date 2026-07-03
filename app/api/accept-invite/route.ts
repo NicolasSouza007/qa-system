@@ -5,28 +5,17 @@ import { adminDb } from "@/app/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-
-  console.log("session user:", session?.user);
-
   if (!session?.user)
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
 
   const { token } = await req.json();
-  console.log("token recebido:", token);
-
   const inviteRef = adminDb.doc(`invites/${token}`);
   const inviteSnap = await inviteRef.get();
-
-  console.log("invite existe?", inviteSnap.exists);
-  console.log("invite data:", inviteSnap.data());
 
   if (!inviteSnap.exists)
     return NextResponse.json({ error: "Convite inválido" }, { status: 404 });
 
   const invite = inviteSnap.data()!;
-
-  console.log("email do invite:", invite.email);
-  console.log("email da session:", session.user.email);
 
   if (invite.email !== session.user.email) {
     return NextResponse.json(
@@ -35,20 +24,36 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const { workspaceId, role } = invite;
+
+  // atualiza ou cria o usuário
   await adminDb.doc(`users/${session.user.id}`).set(
     {
       name: session.user.name,
       email: session.user.email,
       photo: session.user.image,
-      role: "member",
       createdAt: new Date(),
     },
     { merge: true },
   );
 
-  await inviteRef.update({ accepted: true });
+  // adiciona como membro do workspace com o role do convite
+  await adminDb
+    .doc(`workspaceMembers/${workspaceId}/members/${session.user.id}`)
+    .set({
+      role,
+      userId: session.user.id,
+      joinedAt: new Date(),
+    });
 
-  console.log("convite aceito com sucesso!");
+  // se for admin, atualiza o workspaceId no usuário
+  if (role === "admin") {
+    await adminDb.doc(`users/${session.user.id}`).update({
+      workspaceId,
+    });
+  }
+
+  await inviteRef.update({ accepted: true });
 
   return NextResponse.json({ ok: true });
 }

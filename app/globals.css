@@ -24,3 +24,39 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Barra de scroll horizontal */
+.overflow-x-auto::-webkit-scrollbar {
+  height: 6px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 999px;
+}
+
+.overflow-x-auto::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}
+
+/* Barra de scroll vertical (colunas) */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 4px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #374151;
+  border-radius: 999px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #4b5563;
+}

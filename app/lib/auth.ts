@@ -1,6 +1,7 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import { adminDb, adminAuth } from "@/app/lib/firebase-admin";
+import { v4 as uuidv4 } from "uuid";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -19,25 +20,54 @@ export const authOptions: NextAuthOptions = {
       const userRef = adminDb.doc(`users/${user.id!}`);
       const userSnap = await userRef.get();
 
+      console.log("userSnap.exists:", userSnap.exists);
+      console.log("userSnap.data():", userSnap.data());
+
       // usuário já existe, deixa entrar
       if (userSnap.exists) return true;
 
-      // verifica se tem qualquer convite para esse e-mail (aceito ou não)
+      // verifica se tem convite pendente
       const invitesSnap = await adminDb
         .collection("invites")
         .where("email", "==", user.email)
         .get();
 
-      if (invitesSnap.empty) return false; // nunca foi convidado, bloqueia
+      if (!invitesSnap.empty) {
+        // tem convite — cria o usuário sem workspace próprio
+        await userRef.set({
+          name: user.name,
+          email: user.email,
+          photo: user.image,
+          createdAt: new Date(),
+        });
+        return true;
+      }
 
-      // cria o usuário como member
+      // novo usuário sem convite — cria conta e workspace próprio
+      const workspaceId = uuidv4();
+
       await userRef.set({
         name: user.name,
         email: user.email,
         photo: user.image,
-        role: "member",
+        workspaceId, // workspace padrão do usuário
         createdAt: new Date(),
       });
+
+      // cria o workspace
+      await adminDb.doc(`workspaces/${workspaceId}`).set({
+        name: `Workspace de ${user.name?.split(" ")[0]}`,
+        ownerId: user.id,
+        createdAt: new Date(),
+      });
+
+      // adiciona como admin do workspace
+      await adminDb
+        .doc(`workspaceMembers/${workspaceId}/members/${user.id}`)
+        .set({
+          role: "admin",
+          joinedAt: new Date(),
+        });
 
       return true;
     },

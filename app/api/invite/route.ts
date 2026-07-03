@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import { adminDb } from "@/app/lib/firebase-admin";
-import { transporter } from "@/app/lib/mailer"; // <- troca o import
+import { transporter } from "@/app/lib/mailer";
 import { v4 as uuidv4 } from "uuid";
 
 export async function POST(req: NextRequest) {
@@ -12,14 +12,26 @@ export async function POST(req: NextRequest) {
   }
 
   const userSnap = await adminDb.doc(`users/${session.user.id}`).get();
-  if (userSnap.data()?.role !== "admin") {
+  const userData = userSnap.data();
+  const workspaceId = userData?.workspaceId;
+
+  if (!workspaceId) {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
 
-  const { name, email } = await req.json();
-  if (!name || !email) {
+  // verifica se é admin do workspace
+  const memberSnap = await adminDb
+    .doc(`workspaceMembers/${workspaceId}/members/${session.user.id}`)
+    .get();
+
+  if (memberSnap.data()?.role !== "admin") {
+    return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
+  }
+
+  const { name, email, role } = await req.json();
+  if (!name || !email || !role) {
     return NextResponse.json(
-      { error: "Nome e e-mail são obrigatórios" },
+      { error: "Nome, e-mail e role são obrigatórios" },
       { status: 400 },
     );
   }
@@ -27,6 +39,7 @@ export async function POST(req: NextRequest) {
   const existing = await adminDb
     .collection("invites")
     .where("email", "==", email.toLowerCase())
+    .where("workspaceId", "==", workspaceId)
     .where("accepted", "==", false)
     .get();
 
@@ -41,6 +54,8 @@ export async function POST(req: NextRequest) {
   await adminDb.doc(`invites/${token}`).set({
     name,
     email: email.toLowerCase(),
+    role, // "admin" ou "member"
+    workspaceId,
     accepted: false,
     createdBy: session.user.id,
     createdAt: new Date(),
@@ -57,25 +72,20 @@ export async function POST(req: NextRequest) {
         <div style="font-family: sans-serif; max-width: 480px; margin: 0 auto; padding: 32px; background: #0a0a0a; color: #fff; border-radius: 16px;">
           <h1 style="color: #7dd3fc; font-size: 24px; margin-bottom: 4px;">QA <span style="color: #fff;">System</span></h1>
           <p style="color: #9ca3af; font-size: 14px; margin-bottom: 32px;">Organize seus testes de forma prática e eficiente</p>
-
           <p style="color: #fff; font-size: 16px; margin-bottom: 8px;">Olá, <strong>${name}</strong>!</p>
           <p style="color: #9ca3af; font-size: 14px; margin-bottom: 32px;">
-            <strong style="color: #fff;">${session.user.name}</strong> te convidou para fazer parte do time no QA System.
+            <strong style="color: #fff;">${session.user.name}</strong> te convidou para fazer parte do time no QA System como <strong style="color: #fff;">${role === "admin" ? "Administrador" : "Membro"}</strong>.
           </p>
-
           <a href="${inviteLink}"
             style="display: block; background: #0ea5e9; color: #fff; text-align: center; padding: 14px; border-radius: 10px; font-size: 15px; font-weight: 600; text-decoration: none; margin-bottom: 24px;">
             Aceitar convite
           </a>
-
           <p style="color: #4b5563; font-size: 12px; text-align: center;">
             Se você não esperava esse convite, pode ignorar este e-mail.
           </p>
         </div>
       `,
     });
-
-    console.log("E-mail enviado com sucesso para:", email);
   } catch (err) {
     console.error("Erro ao enviar e-mail:", err);
     return NextResponse.json(
