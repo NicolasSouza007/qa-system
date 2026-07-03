@@ -9,11 +9,7 @@ export default async function InvitePage({
 }) {
   const { token } = await params;
 
-  console.log("token:", token);
-
   const inviteSnap = await adminDb.doc(`invites/${token}`).get();
-
-  console.log("existe?", inviteSnap.exists);
 
   if (!inviteSnap.exists) redirect("/");
 

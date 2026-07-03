@@ -66,6 +66,13 @@ export function Header() {
               </span>
             </Link>
 
+            <button>
+              <FiBell
+                size={26}
+                className="text-white hover:text-sky-300 duration-300"
+              />
+            </button>
+
             <button onClick={handleLogout}>
               <FiPower
                 size={26}

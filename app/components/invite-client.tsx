@@ -17,9 +17,6 @@ export function InviteClient({
   const [error, setError] = useState("");
 
   useEffect(() => {
-    console.log("status:", status);
-    console.log("session:", session);
-
     if (status !== "authenticated") return;
 
     if (session.user.email !== email) {
@@ -29,19 +26,15 @@ export function InviteClient({
       return;
     }
 
-    console.log("chamando accept-invite com token:", token);
-
     fetch("/api/accept-invite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     })
       .then((res) => {
-        console.log("resposta accept-invite:", res.status);
         return res.json();
       })
       .then((data) => {
-        console.log("data:", data);
         router.push("/dashboard");
       })
       .catch((err) => console.error("erro:", err));

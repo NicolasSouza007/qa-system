@@ -246,7 +246,6 @@ export function KanbanBoard({
     await updateDoc(doc(db, "tasks", activeId), {
       column: targetColumn,
     });
-    console.log("OVER:", over?.id);
   }
 
   return (

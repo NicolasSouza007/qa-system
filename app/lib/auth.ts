@@ -20,9 +20,6 @@ export const authOptions: NextAuthOptions = {
       const userRef = adminDb.doc(`users/${user.id!}`);
       const userSnap = await userRef.get();
 
-      console.log("userSnap.exists:", userSnap.exists);
-      console.log("userSnap.data():", userSnap.data());
-
       // usuário já existe, deixa entrar
       if (userSnap.exists) return true;
 
