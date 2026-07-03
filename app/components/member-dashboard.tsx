@@ -295,6 +295,7 @@ export function MemberDashboard({
         <TaskModal
           task={selectedTask}
           workspaceId={workspaceId}
+          isAdmin={false} // <- member não vê botões de editar e excluir
           currentUser={{
             id: session.user.id,
             name: session.user.name ?? "Usuário",

@@ -53,7 +53,6 @@ export default async function Dashboard() {
     console.log("sem workspaceId, redirecionando para /");
     redirect("/");
   }
-  // ...resto do código
 
   return (
     <div className="bg-gray-800 px-6 py-8 w-10/12 h-220 mx-auto ">
@@ -63,7 +62,6 @@ export default async function Dashboard() {
           <span className="text-sky-300">
             {session.user.name?.split(" ")[0]}
           </span>{" "}
-          👋
         </h2>
         <p className="text-gray-200 text-sm mt-1">
           {role === "admin" ? "Visão geral do time" : "Suas tasks de hoje"}

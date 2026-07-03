@@ -11,6 +11,7 @@ import {
   doc,
   deleteDoc,
   getDocs,
+  updateDoc,
 } from "firebase/firestore";
 import {
   FiX,
@@ -21,6 +22,8 @@ import {
   FiImage,
   FiTrash2,
   FiAlertTriangle,
+  FiEdit2,
+  FiCheck,
 } from "react-icons/fi";
 
 type Task = {
@@ -47,6 +50,12 @@ type Attachment = {
   createdAt: any;
 };
 
+type User = {
+  id: string;
+  name: string;
+  photo: string;
+};
+
 const priorityLabel: Record<string, { label: string; color: string }> = {
   high: {
     label: "Alta",
@@ -62,22 +71,21 @@ const priorityLabel: Record<string, { label: string; color: string }> = {
   },
 };
 
-const columnLabel: Record<string, string> = {
-  today: "Testes de hoje",
-  bugs: "Bugs",
-  review: "Revisão",
-  approved: "Aprovado",
-};
-
 export function TaskModal({
   task,
   workspaceId,
   currentUser,
+  isAdmin = false,
+  members = [],
+  columns = [],
   onClose,
 }: {
   task: Task;
   workspaceId: string;
   currentUser: { id: string; name: string; photo: string };
+  isAdmin?: boolean;
+  members?: User[];
+  columns?: { key: string; label: string }[];
   onClose: () => void;
 }) {
   const [comments, setComments] = useState<Comment[]>([]);
@@ -88,6 +96,18 @@ export function TaskModal({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // estados de edição
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    title: task.title,
+    module: task.module,
+    priority: task.priority,
+    column: task.column,
+    assignedTo: "",
+  });
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -133,29 +153,23 @@ export function TaskModal({
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploading(true);
     setUploadProgress(0);
-
     const formData = new FormData();
     formData.append("file", file);
     formData.append("taskId", task.id);
-
     try {
       const interval = setInterval(() => {
         setUploadProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
-
       const res = await fetch("/api/upload", {
         method: "POST",
         body: formData,
       });
       clearInterval(interval);
       setUploadProgress(100);
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
       await addDoc(
         collection(db, "tasks", workspaceId, "tasks", task.id, "attachments"),
         {
@@ -178,23 +192,35 @@ export function TaskModal({
     setDeleting(true);
     try {
       const taskRef = doc(db, "tasks", workspaceId, "tasks", task.id);
-
-      // deleta todos os comentários
       const commentsSnap = await getDocs(collection(taskRef, "comments"));
       await Promise.all(commentsSnap.docs.map((d) => deleteDoc(d.ref)));
-
-      // deleta todos os anexos
       const attachmentsSnap = await getDocs(collection(taskRef, "attachments"));
       await Promise.all(attachmentsSnap.docs.map((d) => deleteDoc(d.ref)));
-
-      // deleta a task
       await deleteDoc(taskRef);
-
       onClose();
     } catch (err) {
       console.error("Erro ao deletar task:", err);
       setDeleting(false);
     }
+  }
+
+  async function handleSaveEdit() {
+    if (!editForm.title.trim() || !editForm.module.trim()) return;
+    setSavingEdit(true);
+    const updateData: any = {
+      title: editForm.title.trim(),
+      module: editForm.module.trim(),
+      priority: editForm.priority,
+      column: editForm.column,
+      updatedAt: serverTimestamp(),
+    };
+    if (editForm.assignedTo) updateData.assignedTo = editForm.assignedTo;
+    await updateDoc(
+      doc(db, "tasks", workspaceId, "tasks", task.id),
+      updateData,
+    );
+    setSavingEdit(false);
+    setIsEditing(false);
   }
 
   function formatTime(timestamp: any) {
@@ -213,6 +239,8 @@ export function TaskModal({
   }
 
   const priority = priorityLabel[task.priority];
+  const colLabel =
+    columns.find((c) => c.key === task.column)?.label ?? task.column;
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -220,31 +248,141 @@ export function TaskModal({
         {/* Header */}
         <div className="flex items-start justify-between p-6 border-b border-gray-800">
           <div className="flex-1 pr-4">
-            <div className="flex items-center gap-2 mb-2 flex-wrap">
-              <span
-                className={`text-xs font-medium px-2 py-0.5 rounded-full border ${priority.color}`}
-              >
-                {priority.label}
-              </span>
-              <span className="text-xs text-gray-500">•</span>
-              <span className="text-xs text-gray-400">
-                {columnLabel[task.column] ?? task.column}
-              </span>
-              <span className="text-xs text-gray-500">•</span>
-              <span className="text-xs text-gray-400">{task.module}</span>
-            </div>
-            <h2 className="text-white font-semibold text-lg leading-tight">
-              {task.title}
-            </h2>
+            {isEditing ? (
+              <div className="flex flex-col gap-3">
+                <input
+                  value={editForm.title}
+                  onChange={(e) =>
+                    setEditForm({ ...editForm, title: e.target.value })
+                  }
+                  className="w-full bg-gray-800 border border-sky-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none"
+                  placeholder="Título da task"
+                />
+                <div className="flex gap-2">
+                  <input
+                    value={editForm.module}
+                    onChange={(e) =>
+                      setEditForm({ ...editForm, module: e.target.value })
+                    }
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500"
+                    placeholder="Módulo"
+                  />
+                  <select
+                    value={editForm.priority}
+                    onChange={(e) =>
+                      setEditForm({
+                        ...editForm,
+                        priority: e.target.value as Task["priority"],
+                      })
+                    }
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500"
+                  >
+                    <option value="high">Alta</option>
+                    <option value="medium">Média</option>
+                    <option value="low">Baixa</option>
+                  </select>
+                  {columns.length > 0 && (
+                    <select
+                      value={editForm.column}
+                      onChange={(e) =>
+                        setEditForm({ ...editForm, column: e.target.value })
+                      }
+                      className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500"
+                    >
+                      {columns.map((c) => (
+                        <option key={c.key} value={c.key}>
+                          {c.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                {members.length > 0 && (
+                  <div>
+                    <p className="text-gray-400 text-xs mb-1">
+                      Reatribuir para:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {members.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() =>
+                            setEditForm({ ...editForm, assignedTo: m.id })
+                          }
+                          className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs duration-200 ${
+                            editForm.assignedTo === m.id
+                              ? "border-sky-500 bg-sky-500/10 text-sky-400"
+                              : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
+                          }`}
+                        >
+                          <img
+                            src={m.photo}
+                            alt={m.name}
+                            className="w-4 h-4 rounded-full"
+                          />
+                          {m.name.split(" ")[0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleSaveEdit}
+                    disabled={savingEdit}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500 hover:bg-sky-400 text-white text-xs rounded-lg duration-200 disabled:opacity-50"
+                  >
+                    <FiCheck size={13} />
+                    {savingEdit ? "Salvando..." : "Salvar"}
+                  </button>
+                  <button
+                    onClick={() => setIsEditing(false)}
+                    className="px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-400 text-xs rounded-lg duration-200"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full border ${priority.color}`}
+                  >
+                    {priority.label}
+                  </span>
+                  <span className="text-xs text-gray-500">•</span>
+                  <span className="text-xs text-gray-400">{colLabel}</span>
+                  <span className="text-xs text-gray-500">•</span>
+                  <span className="text-xs text-gray-400">{task.module}</span>
+                </div>
+                <h2 className="text-white font-semibold text-lg leading-tight">
+                  {task.title}
+                </h2>
+              </>
+            )}
           </div>
+
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="text-gray-600 hover:text-red-400 duration-200"
-              title="Excluir task"
-            >
-              <FiTrash2 size={18} />
-            </button>
+            {/* botões só para admin */}
+            {isAdmin && !isEditing && (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="text-gray-600 hover:text-sky-400 duration-200"
+                  title="Editar task"
+                >
+                  <FiEdit2 size={16} />
+                </button>
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="text-gray-600 hover:text-red-400 duration-200"
+                  title="Excluir task"
+                >
+                  <FiTrash2 size={18} />
+                </button>
+              </>
+            )}
             <button
               onClick={onClose}
               className="text-gray-400 hover:text-white duration-200"
@@ -337,13 +475,11 @@ export function TaskModal({
             <h3 className="text-gray-300 text-sm font-medium mb-3 flex items-center gap-2">
               💬 Comentários {comments.length > 0 && `(${comments.length})`}
             </h3>
-
             {comments.length === 0 && (
               <p className="text-gray-600 text-xs mb-4">
                 Nenhum comentário ainda.
               </p>
             )}
-
             <div className="flex flex-col gap-4 mb-4">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex items-start gap-3">
@@ -402,10 +538,10 @@ export function TaskModal({
         </div>
       </div>
 
-      {/* Modal de confirmação de exclusão */}
+      {/* Modal confirmação de exclusão de task */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-60 p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm mx-4">
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-20 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
                 <FiAlertTriangle size={20} className="text-red-400" />
@@ -417,14 +553,12 @@ export function TaskModal({
                 </p>
               </div>
             </div>
-
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-6">
               <p className="text-red-300 text-xs">
                 Os comentários e os arquivos importados serão apagados
                 permanentemente.
               </p>
             </div>
-
             <div className="flex gap-3">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
@@ -436,7 +570,7 @@ export function TaskModal({
               <button
                 onClick={handleDeleteTask}
                 disabled={deleting}
-                className="flex-1 bg-red-500 hover:bg-red-400 disabled:bg-red-500/50 text-white text-sm font-medium py-2.5 rounded-lg duration-200 disabled:cursor-not-allowed"
+                className="flex-1 bg-red-500 hover:bg-red-400 disabled:bg-red-500/50 text-white text-sm font-medium py-2.5 rounded-lg duration-200"
               >
                 {deleting ? "Excluindo..." : "Excluir"}
               </button>

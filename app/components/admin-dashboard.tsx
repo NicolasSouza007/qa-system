@@ -34,6 +34,7 @@ import {
   FiCheck,
   FiTrash2,
   FiEdit2,
+  FiAlertTriangle,
 } from "react-icons/fi";
 import { useSession } from "next-auth/react";
 import { TaskModal } from "@/app/components/task-modal";
@@ -103,6 +104,8 @@ function SortableCard({
     transition,
     opacity: isDragging ? 0.4 : 1,
   };
+
+  const [colToDelete, setColToDelete] = useState<string | null>(null);
 
   return (
     <div
@@ -275,6 +278,7 @@ export function AdminDashboard({
   const editInputRef = useRef<HTMLInputElement>(null);
   const [addingCol, setAddingCol] = useState(false);
   const [newColLabel, setNewColLabel] = useState("");
+  const [colToDelete, setColToDelete] = useState<string | null>(null);
 
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({
@@ -374,10 +378,15 @@ export function AdminDashboard({
       alert("Não é possível remover uma coluna que possui tasks.");
       return;
     }
-    if (!confirm("Remover esta coluna?")) return;
-    const newCols = columns.filter((c) => c.key !== key);
+    setColToDelete(key); // abre o modal de confirmação
+  }
+
+  async function confirmRemoveCol() {
+    if (!colToDelete) return;
+    const newCols = columns.filter((c) => c.key !== colToDelete);
     setColumns(newCols);
     await saveColumns(newCols);
+    setColToDelete(null);
   }
 
   function handleDragStart(event: DragStartEvent) {
@@ -917,6 +926,9 @@ export function AdminDashboard({
         <TaskModal
           task={selectedTask}
           workspaceId={workspaceId}
+          isAdmin={true} // <- admin vê botões de editar e excluir
+          members={members} // <- para reatribuir
+          columns={columns} // <- para mudar coluna
           currentUser={{
             id: session.user.id,
             name: session.user.name ?? "Admin",
@@ -925,6 +937,48 @@ export function AdminDashboard({
           onClose={() => setSelectedTask(null)}
         />
       )}
+
+      {/* Modal confirmação exclusão de coluna */}
+      {colToDelete && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
+                <FiAlertTriangle size={20} className="text-red-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">Remover coluna?</h3>
+                <p className="text-gray-400 text-xs mt-0.5">
+                  "{columns.find((c) => c.key === colToDelete)?.label}"
+                </p>
+              </div>
+            </div>
+            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-6">
+              <p className="text-red-300 text-xs">
+                A coluna será removida permanentemente do board. As tasks
+                precisam ser movidas antes de remover.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setColToDelete(null)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 text-sm font-medium py-2.5 rounded-lg duration-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmRemoveCol}
+                className="flex-1 bg-red-500 hover:bg-red-400 text-white text-sm font-medium py-2.5 rounded-lg duration-200"
+              >
+                Remover
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+function setColToDelete(key: string) {
+  throw new Error("Function not implemented.");
 }

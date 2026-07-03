@@ -1,5 +1,5 @@
 "use client";
-import { FiUser, FiPower, FiLoader } from "react-icons/fi";
+import { FiUser, FiPower, FiLoader, FiBell } from "react-icons/fi";
 import { signIn, signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
