@@ -4,8 +4,6 @@ import { db } from "@/app/lib/firebase";
 import {
   collection,
   onSnapshot,
-  addDoc,
-  serverTimestamp,
   doc,
   deleteDoc,
   updateDoc,
@@ -17,6 +15,7 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCorners,
@@ -40,7 +39,6 @@ import { useSession } from "next-auth/react";
 import { TaskModal } from "@/app/components/task-modal";
 
 type ColumnDef = { key: string; label: string };
-
 type Task = {
   id: string;
   title: string;
@@ -49,13 +47,7 @@ type Task = {
   module: string;
   assignedTo: string;
 };
-
-type User = {
-  id: string;
-  name: string;
-  photo: string;
-  role: string;
-};
+type User = { id: string; name: string; photo: string; role: string };
 
 const defaultColumns: ColumnDef[] = [
   { key: "today", label: "Testes de hoje" },
@@ -99,18 +91,14 @@ function SortableCard({
     data: { column: task.column },
   });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
-  const [colToDelete, setColToDelete] = useState<string | null>(null);
-
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.4 : 1,
+      }}
       className="bg-gray-800 rounded-lg p-3 mb-2 border border-gray-600 hover:border-gray-400 duration-200"
     >
       <div
@@ -139,7 +127,7 @@ function SortableCard({
                 e.stopPropagation();
                 onOpen(task);
               }}
-              className="text-white hover:text-gray-300 duration-200 text-sm px-2 py-0.5 rounded hover:bg-gray-900"
+              className="text-gray-500 hover:text-gray-300 duration-200 text-xs px-2 py-0.5 rounded hover:bg-gray-700"
             >
               Ver
             </button>
@@ -185,11 +173,11 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={`w-68 bg-gray-900 rounded-xl border p-4 h-110 flex flex-col transition-colors duration-200 ${
+      className={`w-64 sm:w-72 bg-gray-900 rounded-xl border p-3 sm:p-4 flex flex-col max-h-[60vh] sm:max-h-[calc(100vh-320px)] transition-colors duration-200 ${
         isOver ? "border-sky-500 bg-gray-800" : "border-gray-700"
       }`}
     >
-      <div className="flex items-center justify-between mb-4 shrink-0 gap-2">
+      <div className="flex items-center justify-between mb-3 sm:mb-4 shrink-0 gap-2">
         {isEditing ? (
           <input
             ref={editInputRef}
@@ -203,7 +191,6 @@ function DroppableColumn({
           <span
             className="text-sm font-medium text-gray-200 cursor-pointer hover:text-white duration-200 flex-1 truncate"
             onClick={() => onRename(col)}
-            title="Clique para renomear"
           >
             {col.label}
           </span>
@@ -215,20 +202,17 @@ function DroppableColumn({
           <button
             onClick={() => onRename(col)}
             className="text-gray-600 hover:text-gray-300 duration-200"
-            title="Renomear"
           >
             <FiEdit2 size={12} />
           </button>
           <button
             onClick={() => onRemove(col.key)}
             className="text-gray-600 hover:text-red-400 duration-200"
-            title="Remover coluna"
           >
             <FiTrash2 size={12} />
           </button>
         </div>
       </div>
-
       <div className="overflow-y-auto flex-1 pr-1">
         <SortableContext
           items={tasks.map((t) => t.id)}
@@ -275,10 +259,10 @@ export function AdminDashboard({
 
   const [editingColKey, setEditingColKey] = useState<string | null>(null);
   const [editingLabel, setEditingLabel] = useState("");
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const [colToDelete, setColToDelete] = useState<string | null>(null);
+  const editInputRef = useRef<HTMLInputElement | null>(null);
   const [addingCol, setAddingCol] = useState(false);
   const [newColLabel, setNewColLabel] = useState("");
-  const [colToDelete, setColToDelete] = useState<string | null>(null);
 
   const [inviteModal, setInviteModal] = useState(false);
   const [inviteForm, setInviteForm] = useState({
@@ -293,6 +277,9 @@ export function AdminDashboard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
   );
 
   useEffect(() => {
@@ -302,7 +289,6 @@ export function AdminDashboard({
         setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Task));
       },
     );
-
     const unsubMembers = onSnapshot(
       collection(db, "workspaceMembers", workspaceId, "members"),
       async (snap) => {
@@ -326,7 +312,6 @@ export function AdminDashboard({
         setMembers(memberData);
       },
     );
-
     const unsubWorkspace = onSnapshot(
       doc(db, "workspaces", workspaceId),
       (snap) => {
@@ -335,7 +320,6 @@ export function AdminDashboard({
           setColumns(data.columns);
       },
     );
-
     return () => {
       unsubTasks();
       unsubMembers();
@@ -373,12 +357,12 @@ export function AdminDashboard({
     setAddingCol(false);
   }
 
-  async function handleRemoveCol(key: string) {
+  function handleRemoveCol(key: string) {
     if (tasks.some((t) => t.column === key)) {
       alert("Não é possível remover uma coluna que possui tasks.");
       return;
     }
-    setColToDelete(key); // abre o modal de confirmação
+    setColToDelete(key);
   }
 
   async function confirmRemoveCol() {
@@ -401,7 +385,6 @@ export function AdminDashboard({
     const overId = over.id as string;
     const activeTask = tasks.find((t) => t.id === activeId);
     if (!activeTask) return;
-
     const overColumn = columns.find((c) => c.key === overId);
     if (overColumn && activeTask.column !== overColumn.key) {
       setTasks((prev) =>
@@ -440,12 +423,13 @@ export function AdminDashboard({
   async function handleSave() {
     if (!form.title.trim() || !form.module.trim() || !form.assignedTo) return;
     setSaving(true);
-    await addDoc(collection(db, "tasks", workspaceId, "tasks"), {
-      ...form,
-      workspaceId,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
+
+    await fetch("/api/tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...form, workspaceId }),
     });
+
     setSaving(false);
     setForm(emptyForm);
     setModalOpen(false);
@@ -487,11 +471,11 @@ export function AdminDashboard({
     <div>
       {/* Resumo por membro */}
       {members.length > 0 && (
-        <div className="mb-8">
-          <h3 className="text-gray-200 text-sm font-medium mb-4">
+        <div className="mb-6 sm:mb-8">
+          <h3 className="text-gray-200 text-sm font-medium mb-3 sm:mb-4">
             Progresso do time
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
             {members.map((member) => {
               const memberTasks = tasks.filter(
                 (t) => t.assignedTo === member.id,
@@ -499,7 +483,7 @@ export function AdminDashboard({
               return (
                 <div
                   key={member.id}
-                  className="bg-gray-900 border border-gray-500 rounded-xl p-4"
+                  className="bg-gray-900 border border-gray-500 rounded-xl p-3 sm:p-4"
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-3">
@@ -520,18 +504,15 @@ export function AdminDashboard({
                     <button
                       onClick={() => handleRemoveMember(member.id)}
                       className="text-gray-600 hover:text-red-400 duration-200"
-                      title="Remover membro"
                     >
                       <FiTrash2 size={14} />
                     </button>
                   </div>
-
-                  {/* colunas dinâmicas — puxando os nomes reais */}
                   <div className="flex flex-wrap gap-2">
                     {columns.map((col) => (
                       <div
                         key={col.key}
-                        className="flex-1 min-w-20 text-center bg-gray-800 rounded-lg py-2 px-1"
+                        className="flex-1 min-w-60px text-center bg-gray-800 rounded-lg py-1.5 px-1"
                       >
                         <p className="text-white text-sm font-semibold">
                           {
@@ -553,25 +534,25 @@ export function AdminDashboard({
       )}
 
       {/* Header do board */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-2">
         <h3 className="text-gray-200 text-sm font-medium">Board geral</h3>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setModalOpen(true)}
-            className="flex items-center gap-2 bg-sky-500 hover:bg-sky-400 duration-200 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            className="flex items-center gap-1.5 sm:gap-2 bg-sky-500 hover:bg-sky-400 duration-200 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap"
           >
-            <FiPlus size={16} /> Nova task
+            <FiPlus size={14} /> Nova task
           </button>
           <button
             onClick={() => setInviteModal(true)}
-            className="flex items-center gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 duration-200 text-white text-sm font-medium px-4 py-2 rounded-lg"
+            className="flex items-center gap-1.5 sm:gap-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 duration-200 text-white text-xs sm:text-sm font-medium px-3 sm:px-4 py-2 rounded-lg whitespace-nowrap"
           >
-            <FiUserPlus size={16} /> Convidar membro
+            <FiUserPlus size={14} /> Convidar
           </button>
         </div>
       </div>
 
-      {/* Board Kanban com DnD */}
+      {/* Board Kanban */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCorners}
@@ -579,35 +560,30 @@ export function AdminDashboard({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="overflow-x-auto">
-          <div className="flex gap-4 min-w-max">
-            {columns.map((col) => {
-              const colTasks = tasks.filter((t) => t.column === col.key);
-              return (
-                <DroppableColumn
-                  key={col.key}
-                  col={col}
-                  tasks={colTasks}
-                  members={members}
-                  onOpen={setSelectedTask}
-                  onRename={startEditing}
-                  onRemove={handleRemoveCol}
-                  isEditing={editingColKey === col.key}
-                  editingLabel={editingLabel}
-                  onEditingLabelChange={setEditingLabel}
-                  onEditBlur={() => handleRenameCol(col.key, editingLabel)}
-                  onEditKeyDown={(e) => {
-                    if (e.key === "Enter")
-                      handleRenameCol(col.key, editingLabel);
-                    if (e.key === "Escape") setEditingColKey(null);
-                  }}
-                  editInputRef={editInputRef}
-                />
-              );
-            })}
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-3 sm:gap-4 min-w-max">
+            {columns.map((col) => (
+              <DroppableColumn
+                key={col.key}
+                col={col}
+                tasks={tasks.filter((t) => t.column === col.key)}
+                members={members}
+                onOpen={setSelectedTask}
+                onRename={startEditing}
+                onRemove={handleRemoveCol}
+                isEditing={editingColKey === col.key}
+                editingLabel={editingLabel}
+                onEditingLabelChange={setEditingLabel}
+                onEditBlur={() => handleRenameCol(col.key, editingLabel)}
+                onEditKeyDown={(e) => {
+                  if (e.key === "Enter") handleRenameCol(col.key, editingLabel);
+                  if (e.key === "Escape") setEditingColKey(null);
+                }}
+                editInputRef={editInputRef}
+              />
+            ))}
 
-            {/* Botão adicionar coluna */}
-            <div className="w-72 shrink-0">
+            <div className="w-64 sm:w-72 shrink-0">
               {addingCol ? (
                 <div className="bg-gray-900 rounded-xl border border-sky-500 p-4">
                   <input
@@ -646,7 +622,7 @@ export function AdminDashboard({
               ) : (
                 <button
                   onClick={() => setAddingCol(true)}
-                  className="w-full h-20 bg-gray-900/50 hover:bg-gray-900 border border-dashed border-gray-700 hover:border-gray-500 rounded-xl text-gray-500 hover:text-gray-300 duration-200 flex items-center justify-center gap-2 text-sm"
+                  className="w-full h-16 sm:h-20 bg-gray-900/50 hover:bg-gray-900 border border-dashed border-gray-700 hover:border-gray-500 rounded-xl text-gray-500 hover:text-gray-300 duration-200 flex items-center justify-center gap-2 text-sm"
                 >
                   <FiPlus size={16} /> Nova coluna
                 </button>
@@ -676,9 +652,9 @@ export function AdminDashboard({
 
       {/* Modal Nova Task */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-200 rounded-2xl p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 w-full sm:max-w-md">
+            <div className="flex items-center justify-between mb-5">
               <h2 className="text-white font-semibold text-lg">Nova task</h2>
               <button
                 onClick={() => setModalOpen(false)}
@@ -706,7 +682,7 @@ export function AdminDashboard({
                 </label>
                 <input
                   type="text"
-                  placeholder="Ex: Auth, Relatórios, Usuário..."
+                  placeholder="Ex: Auth, Relatórios..."
                   value={form.module}
                   onChange={(e) => setForm({ ...form, module: e.target.value })}
                   className="w-full bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-sky-500"
@@ -765,7 +741,7 @@ export function AdminDashboard({
                     Nenhum membro cadastrado ainda.
                   </p>
                 ) : (
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 max-h-40 overflow-y-auto">
                     {members.map((member) => (
                       <button
                         key={member.id}
@@ -775,7 +751,7 @@ export function AdminDashboard({
                         className={`flex items-center gap-3 p-2 rounded-lg border duration-200 ${
                           form.assignedTo === member.id
                             ? "border-sky-500 bg-sky-500/10"
-                            : "border-gray-700 bg-gray-800 hover:border-gray-600"
+                            : "border-gray-700 bg-gray-800"
                         }`}
                       >
                         <img
@@ -788,7 +764,7 @@ export function AdminDashboard({
                         </span>
                         {form.assignedTo === member.id && (
                           <span className="ml-auto text-sky-400 text-xs">
-                            ✓ selecionado
+                            ✓
                           </span>
                         )}
                       </button>
@@ -804,7 +780,7 @@ export function AdminDashboard({
                   !form.module.trim() ||
                   !form.assignedTo
                 }
-                className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed duration-200 text-white font-medium py-2.5 rounded-lg text-sm mt-2"
+                className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed duration-200 text-white font-medium py-2.5 rounded-lg text-sm"
               >
                 {saving ? "Salvando..." : "Criar task"}
               </button>
@@ -815,9 +791,9 @@ export function AdminDashboard({
 
       {/* Modal Convidar Membro */}
       {inviteModal && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-md mx-4">
-            <div className="flex items-center justify-between mb-6">
+        <div className="fixed inset-0 bg-black/70 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl p-5 sm:p-6 w-full sm:max-w-md">
+            <div className="flex items-center justify-between mb-5">
               <h2 className="text-white font-semibold text-lg">
                 Convidar membro
               </h2>
@@ -840,7 +816,7 @@ export function AdminDashboard({
                 </p>
                 <button
                   onClick={handleCloseInviteModal}
-                  className="mt-6 text-sky-400 hover:text-sky-300 text-sm duration-200"
+                  className="mt-6 text-sky-400 text-sm"
                 >
                   Fechar
                 </button>
@@ -910,7 +886,7 @@ export function AdminDashboard({
                     !inviteForm.name.trim() ||
                     !inviteForm.email.trim()
                   }
-                  className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed duration-200 text-white font-medium py-2.5 rounded-lg text-sm mt-2"
+                  className="w-full bg-sky-500 hover:bg-sky-400 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed duration-200 text-white font-medium py-2.5 rounded-lg text-sm"
                 >
                   {inviteStatus === "sending"
                     ? "Enviando..."
@@ -922,26 +898,10 @@ export function AdminDashboard({
         </div>
       )}
 
-      {selectedTask && session?.user && (
-        <TaskModal
-          task={selectedTask}
-          workspaceId={workspaceId}
-          isAdmin={true} // <- admin vê botões de editar e excluir
-          members={members} // <- para reatribuir
-          columns={columns} // <- para mudar coluna
-          currentUser={{
-            id: session.user.id,
-            name: session.user.name ?? "Admin",
-            photo: session.user.image ?? "",
-          }}
-          onClose={() => setSelectedTask(null)}
-        />
-      )}
-
       {/* Modal confirmação exclusão de coluna */}
       {colToDelete && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
                 <FiAlertTriangle size={20} className="text-red-400" />
@@ -955,8 +915,7 @@ export function AdminDashboard({
             </div>
             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3 mb-6">
               <p className="text-red-300 text-xs">
-                A coluna será removida permanentemente do board. As tasks
-                precisam ser movidas antes de remover.
+                A coluna será removida permanentemente do board.
               </p>
             </div>
             <div className="flex gap-3">
@@ -976,9 +935,22 @@ export function AdminDashboard({
           </div>
         </div>
       )}
+
+      {selectedTask && session?.user && (
+        <TaskModal
+          task={selectedTask}
+          workspaceId={workspaceId}
+          isAdmin={true}
+          members={members}
+          columns={columns}
+          currentUser={{
+            id: session.user.id,
+            name: session.user.name ?? "Admin",
+            photo: session.user.image ?? "",
+          }}
+          onClose={() => setSelectedTask(null)}
+        />
+      )}
     </div>
   );
-}
-function setColToDelete(key: string) {
-  throw new Error("Function not implemented.");
 }
