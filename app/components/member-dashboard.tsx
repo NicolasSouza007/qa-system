@@ -16,27 +16,23 @@ import {
   DragOverlay,
   DragStartEvent,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCorners,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { useSession } from "next-auth/react";
-import { TaskModal } from "@/app/components/task-modal";
+import { TaskModal } from "@/app/components/modals/task-modal";
+import { KanbanColumn } from "@/app/components/dashboard/kanban-column";
 
 type ColumnDef = { key: string; label: string };
-
 type Task = {
   id: string;
   title: string;
   column: string;
   priority: "high" | "medium" | "low";
   module: string;
+  assignedTo: string;
 };
 
 const defaultColumns: ColumnDef[] = [
@@ -51,111 +47,6 @@ const priorityDot: Record<string, string> = {
   medium: "bg-yellow-500",
   low: "bg-green-500",
 };
-
-function SortableCard({
-  task,
-  onOpen,
-}: {
-  task: Task;
-  onOpen: (task: Task) => void;
-}) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: task.id,
-    data: { column: task.column },
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.4 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className="bg-gray-800 rounded-lg p-3 mb-2 border border-gray-700 hover:border-gray-600 duration-200"
-    >
-      <div
-        {...attributes}
-        {...listeners}
-        className="cursor-grab active:cursor-grabbing"
-      >
-        <p className="text-white text-sm font-medium mb-2">{task.title}</p>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span
-              className={`w-2 h-2 rounded-full ${priorityDot[task.priority]}`}
-            />
-            <span className="text-gray-400 text-xs">{task.module}</span>
-          </div>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onOpen(task);
-            }}
-            className="text-white hover:text-gray-200 duration-200 text-sm px-2 py-0.5 rounded hover:bg-gray-900"
-          >
-            Ver
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function DroppableColumn({
-  col,
-  tasks,
-  onOpen,
-}: {
-  col: ColumnDef;
-  tasks: Task[];
-  onOpen: (task: Task) => void;
-}) {
-  const { setNodeRef, isOver } = useSortable({
-    id: col.key,
-    data: { type: "column" },
-  });
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={`w-72 bg-gray-900 rounded-xl border p-4 flex flex-col max-h-[calc(100vh-320px)] transition-colors duration-200 ${
-        isOver ? "border-sky-500 bg-gray-800" : "border-gray-800"
-      }`}
-    >
-      <div className="flex items-center justify-between mb-4 shrink-0">
-        <span className="text-sm font-medium text-gray-200">{col.label}</span>
-        <span className="text-xs bg-gray-800 text-gray-400 px-2 py-0.5 rounded-full">
-          {tasks.length}
-        </span>
-      </div>
-      <div className="overflow-y-auto flex-1 pr-1">
-        <SortableContext
-          items={tasks.map((t) => t.id)}
-          strategy={verticalListSortingStrategy}
-        >
-          {tasks.length === 0 && (
-            <p className="text-gray-600 text-xs text-center mt-8">
-              Nenhuma task
-            </p>
-          )}
-          {tasks.map((task) => (
-            <SortableCard key={task.id} task={task} onOpen={onOpen} />
-          ))}
-        </SortableContext>
-      </div>
-    </div>
-  );
-}
 
 export function MemberDashboard({
   userId,
@@ -172,6 +63,9 @@ export function MemberDashboard({
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 },
+    }),
   );
 
   useEffect(() => {
@@ -182,18 +76,14 @@ export function MemberDashboard({
     const unsubTasks = onSnapshot(q, (snap) => {
       setTasks(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Task));
     });
-
-    // busca colunas do workspace
     const unsubWorkspace = onSnapshot(
       doc(db, "workspaces", workspaceId),
       (snap) => {
         const data = snap.data();
-        if (data?.columns && Array.isArray(data.columns)) {
+        if (data?.columns && Array.isArray(data.columns))
           setColumns(data.columns);
-        }
       },
     );
-
     return () => {
       unsubTasks();
       unsubWorkspace();
@@ -212,7 +102,6 @@ export function MemberDashboard({
     const overId = over.id as string;
     const activeTask = tasks.find((t) => t.id === activeId);
     if (!activeTask) return;
-
     const overColumn = columns.find((c) => c.key === overId);
     if (overColumn && activeTask.column !== overColumn.key) {
       setTasks((prev) =>
@@ -257,21 +146,19 @@ export function MemberDashboard({
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="overflow-x-auto">
-          <div className="flex gap-4 min-w-max">
-            {columns.map((col) => {
-              const colTasks = tasks.filter((t) => t.column === col.key);
-              return (
-                <DroppableColumn
-                  key={col.key}
-                  col={col}
-                  tasks={colTasks}
-                  onOpen={setSelectedTask}
-                />
-              );
-            })}
+        <div className="overflow-x-auto pb-4">
+          <div className="flex gap-3 sm:gap-4 min-w-max">
+            {columns.map((col) => (
+              <KanbanColumn
+                key={col.key}
+                col={col}
+                tasks={tasks.filter((t) => t.column === col.key)}
+                onOpen={setSelectedTask}
+              />
+            ))}
           </div>
         </div>
+
         <DragOverlay>
           {activeTask && (
             <div className="bg-gray-800 rounded-lg p-3 border border-sky-500 shadow-xl shadow-black/50 cursor-grabbing rotate-2">
@@ -295,7 +182,7 @@ export function MemberDashboard({
         <TaskModal
           task={selectedTask}
           workspaceId={workspaceId}
-          isAdmin={false} // <- member não vê botões de editar e excluir
+          isAdmin={false}
           currentUser={{
             id: session.user.id,
             name: session.user.name ?? "Usuário",
