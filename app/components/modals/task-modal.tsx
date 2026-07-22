@@ -96,8 +96,6 @@ export function TaskModal({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
-
-  // estados de edição
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
     title: task.title,
@@ -107,7 +105,6 @@ export function TaskModal({
     assignedTo: "",
   });
   const [savingEdit, setSavingEdit] = useState(false);
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -243,13 +240,13 @@ export function TaskModal({
     columns.find((c) => c.key === task.column)?.label ?? task.column;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+      <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-start justify-between p-6 border-b border-gray-800">
-          <div className="flex-1 pr-4">
+        <div className="flex items-start justify-between p-4 sm:p-6 border-b border-gray-800">
+          <div className="flex-1 pr-3">
             {isEditing ? (
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-3 w-full">
                 <input
                   value={editForm.title}
                   onChange={(e) =>
@@ -258,13 +255,13 @@ export function TaskModal({
                   className="w-full bg-gray-800 border border-sky-500 rounded-lg px-3 py-2 text-white text-sm focus:outline-none"
                   placeholder="Título da task"
                 />
-                <div className="flex gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <input
                     value={editForm.module}
                     onChange={(e) =>
                       setEditForm({ ...editForm, module: e.target.value })
                     }
-                    className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500"
+                    className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-sky-500"
                     placeholder="Módulo"
                   />
                   <select
@@ -299,7 +296,7 @@ export function TaskModal({
                 </div>
                 {members.length > 0 && (
                   <div>
-                    <p className="text-gray-400 text-xs mb-1">
+                    <p className="text-gray-400 text-xs mb-2">
                       Reatribuir para:
                     </p>
                     <div className="flex flex-wrap gap-2">
@@ -312,7 +309,7 @@ export function TaskModal({
                           className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border text-xs duration-200 ${
                             editForm.assignedTo === m.id
                               ? "border-sky-500 bg-sky-500/10 text-sky-400"
-                              : "border-gray-700 bg-gray-800 text-gray-400 hover:border-gray-600"
+                              : "border-gray-700 bg-gray-800 text-gray-400"
                           }`}
                         >
                           <img
@@ -356,7 +353,7 @@ export function TaskModal({
                   <span className="text-xs text-gray-500">•</span>
                   <span className="text-xs text-gray-400">{task.module}</span>
                 </div>
-                <h2 className="text-white font-semibold text-lg leading-tight">
+                <h2 className="text-white font-semibold text-base sm:text-lg leading-tight">
                   {task.title}
                 </h2>
               </>
@@ -364,7 +361,6 @@ export function TaskModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {/* botões só para admin */}
             {isAdmin && !isEditing && (
               <>
                 <button
@@ -393,7 +389,7 @@ export function TaskModal({
         </div>
 
         {/* Conteúdo scrollável */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-6">
           {/* Anexos */}
           <div>
             <div className="flex items-center justify-between mb-3">
@@ -433,7 +429,7 @@ export function TaskModal({
               <p className="text-gray-600 text-xs">Nenhum anexo ainda.</p>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {attachments.map((att) => (
                 <a
                   key={att.id}
@@ -488,8 +484,8 @@ export function TaskModal({
                     alt={comment.authorName}
                     className="w-7 h-7 rounded-full shrink-0 mt-0.5"
                   />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <span className="text-white text-xs font-medium">
                         {comment.authorName.split(" ")[0]}
                       </span>
@@ -498,7 +494,9 @@ export function TaskModal({
                       </span>
                     </div>
                     <div className="bg-gray-800 rounded-lg px-3 py-2">
-                      <p className="text-gray-300 text-sm">{comment.text}</p>
+                      <p className="text-gray-300 text-sm break-words">
+                        {comment.text}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -508,8 +506,8 @@ export function TaskModal({
         </div>
 
         {/* Input comentário */}
-        <div className="p-4 border-t border-gray-800">
-          <div className="flex items-center gap-3">
+        <div className="p-3 sm:p-4 border-t border-gray-800">
+          <div className="flex items-center gap-2 sm:gap-3">
             <img
               src={currentUser.photo}
               alt={currentUser.name}
@@ -524,12 +522,12 @@ export function TaskModal({
                 onKeyDown={(e) =>
                   e.key === "Enter" && !e.shiftKey && handleSendComment()
                 }
-                className="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none"
+                className="flex-1 bg-transparent text-white text-sm placeholder-gray-600 focus:outline-none min-w-0"
               />
               <button
                 onClick={handleSendComment}
                 disabled={sending || !commentText.trim()}
-                className="text-sky-400 hover:text-sky-300 disabled:text-gray-600 duration-200"
+                className="text-sky-400 hover:text-sky-300 disabled:text-gray-600 duration-200 shrink-0"
               >
                 <FiSend size={16} />
               </button>
@@ -538,10 +536,10 @@ export function TaskModal({
         </div>
       </div>
 
-      {/* Modal confirmação de exclusão de task */}
+      {/* Modal confirmação exclusão de task */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-20 p-4">
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-6 w-full max-w-sm">
+        <div className="fixed inset-0 bg-black/60 flex items-end sm:items-center justify-center z-60 p-0 sm:p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-t-2xl sm:rounded-2xl p-6 w-full sm:max-w-sm">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center shrink-0">
                 <FiAlertTriangle size={20} className="text-red-400" />
