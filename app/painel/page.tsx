@@ -45,6 +45,26 @@ export default async function PainelPage() {
             </span>
           </Link>
 
+          <Link
+            href="/clientes"
+            className="group bg-gray-900 hover:bg-gray-800 border border-gray-700 hover:border-green-500 rounded-2xl p-6 sm:p-8 flex flex-col gap-4 duration-300 sm:col-span-2 lg:col-span-1"
+          >
+            <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center group-hover:bg-green-500/30 duration-300">
+              <span className="text-2xl">👥</span>
+            </div>
+            <div>
+              <h2 className="text-white font-semibold text-lg mb-1 group-hover:text-green-300 duration-300">
+                Clientes
+              </h2>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Cadastre e gerencie os clientes para vincular aos chamados.
+              </p>
+            </div>
+            <span className="text-green-400 text-sm font-medium flex items-center gap-1 mt-auto">
+              Ver clientes →
+            </span>
+          </Link>
+
           {/* Tickets */}
           <Link
             href="/tickets"
