@@ -29,13 +29,21 @@ type Ticket = {
   priority: "high" | "medium" | "low";
   category: string;
   status: "open" | "closed";
+
   assignedTo: string;
+
   createdBy: string;
   createdByName: string;
   createdByPhoto: string;
+
+  resolvedBy?: string;
+  resolvedAt?: any;
+
   workspaceId: string;
+
   clientId?: string;
   clientName?: string;
+
   createdAt: any;
   updatedAt: any;
 };
@@ -75,7 +83,7 @@ const categories = [
   "Bug",
   "Melhoria",
   "Dúvida",
-  "Infraestrutura",
+  "Chamados",
   "Segurança",
   "Outro",
 ];
@@ -214,10 +222,25 @@ export function TicketsClient({
   }
 
   async function handleToggleStatus(ticket: Ticket) {
-    await updateDoc(doc(db, "tickets", ticket.id), {
-      status: ticket.status === "open" ? "closed" : "open",
-      updatedAt: serverTimestamp(),
-    });
+    const ticketRef = doc(db, "tickets", ticket.id);
+
+    if (ticket.status === "open") {
+      // Fechando o chamado
+      await updateDoc(ticketRef, {
+        status: "closed",
+        resolvedBy: userId,
+        resolvedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } else {
+      // Reabrindo o chamado
+      await updateDoc(ticketRef, {
+        status: "open",
+        resolvedBy: null,
+        resolvedAt: null,
+        updatedAt: serverTimestamp(),
+      });
+    }
   }
 
   function formatTime(timestamp: any) {
@@ -710,7 +733,9 @@ export function TicketsClient({
                 </div>
               </div>
 
-              {(role === "admin" || selectedTicket.createdBy === userId) && (
+              {(role === "admin" ||
+                selectedTicket.createdBy === userId ||
+                selectedTicket.assignedTo === userId) && (
                 <button
                   onClick={() => {
                     handleToggleStatus(selectedTicket);

@@ -26,5 +26,6 @@ export const config = {
     "/painel/:path*",
     "/tickets/:path*",
     "/clientes/:path*",
+    "/login/:path*",
   ],
 };
