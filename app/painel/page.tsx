@@ -9,7 +9,7 @@ const categories = [
   "Bug",
   "Melhoria",
   "Dúvida",
-  "Chamadoss",
+  "Chamados",
   "Segurança",
   "Outro",
 ];
