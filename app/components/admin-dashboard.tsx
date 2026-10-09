@@ -98,12 +98,27 @@ export function AdminDashboard({
           const uSnap = await import("firebase/firestore").then(
             ({ getDoc, doc: fDoc }) => getDoc(fDoc(db, "users", d.id)),
           );
-          if (uSnap.exists())
+          if (uSnap.exists()) {
+            const user = uSnap.data();
+            const name =
+              [user.name, user.displayName, user.email].find(
+                (value): value is string =>
+                  typeof value === "string" && value.trim().length > 0,
+              ) ?? "Usuário";
+            const photo =
+              typeof user.photo === "string"
+                ? user.photo
+                : typeof user.photoURL === "string"
+                  ? user.photoURL
+                  : "";
+
             data.push({
               id: d.id,
-              role: d.data().role,
-              ...uSnap.data(),
-            } as User);
+              name,
+              photo,
+              role: d.data().role ?? user.role ?? "member",
+            });
+          }
         }
         setMembers(data);
       },
