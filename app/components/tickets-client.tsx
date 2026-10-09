@@ -145,13 +145,19 @@ export function TicketsClient({
           const uSnap = await import("firebase/firestore").then(
             ({ getDoc, doc: fDoc }) => getDoc(fDoc(db, "users", d.id)),
           );
-          if (uSnap.exists())
+
+          if (uSnap.exists()) {
+            const user = uSnap.data();
+
             data.push({
               id: d.id,
-              role: d.data().role,
-              ...uSnap.data(),
-            } as Member);
+              role: d.data().role ?? user.role ?? "member",
+              name: user.name ?? user.displayName ?? user.email ?? "Usuário",
+              photo: user.photo ?? user.photoURL ?? "",
+            });
+          }
         }
+
         setMembers(data);
       },
     );
@@ -181,44 +187,53 @@ export function TicketsClient({
 
   async function handleSave() {
     if (!form.title.trim() || !form.description.trim()) return;
+
     setSaving(true);
 
-    const assignedTo =
-      role === "admin" && form.assignedTo ? form.assignedTo : userId;
+    try {
+      const assignedTo =
+        role === "admin" && form.assignedTo ? form.assignedTo : userId;
 
-    await addDoc(collection(db, "tickets"), {
-      title: form.title,
-      description: form.description,
-      priority: form.priority,
-      category: form.category,
-      assignedTo,
-      clientId: form.clientId || null,
-      clientName: form.clientName || null,
-      status: "open",
-      workspaceId,
-      createdBy: userId,
-      createdByName: userName,
-      createdByPhoto: userPhoto,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    if (assignedTo !== userId) {
-      await addDoc(collection(db, "notifications"), {
-        userId: assignedTo,
+      await addDoc(collection(db, "tickets"), {
+        title: form.title.trim(),
+        description: form.description.trim(),
+        priority: form.priority,
+        category: form.category,
+        assignedTo,
+        clientId: form.clientId || null,
+        clientName: form.clientName || null,
+        status: "open",
         workspaceId,
-        taskId: "",
-        taskTitle: form.title,
-        message: `${userName} abriu um ticket para você: "${form.title}"`,
-        read: false,
+        createdBy: userId,
+        createdByName: userName || "Usuário",
+        createdByPhoto: userPhoto || "",
         createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
-    }
 
-    setSaving(false);
-    setForm(emptyForm);
-    setClientSearch("");
-    setModalOpen(false);
+      if (assignedTo !== userId) {
+        await addDoc(collection(db, "notifications"), {
+          userId: assignedTo,
+          workspaceId,
+          taskId: "",
+          taskTitle: form.title.trim(),
+          message: `${userName || "Usuário"} abriu um ticket para você: "${form.title.trim()}"`,
+          read: false,
+          createdAt: serverTimestamp(),
+        });
+      }
+
+      setForm(emptyForm);
+      setClientSearch("");
+      setModalOpen(false);
+    } catch (error) {
+      console.error("Erro ao criar ticket:", error);
+      alert(
+        "Não foi possível criar o ticket. Verifique o console e tente novamente.",
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleToggleStatus(ticket: Ticket) {
@@ -602,7 +617,7 @@ export function TicketsClient({
                           className="w-7 h-7 rounded-full"
                         />
                         <span className="text-white text-sm">
-                          {member.name.split(" ")[0]}
+                          {(member.name || "Usuário").split(" ")[0]}
                         </span>
                         <span className="text-gray-500 text-xs ml-auto">
                           {member.role}
@@ -699,7 +714,11 @@ export function TicketsClient({
                       className="w-6 h-6 rounded-full"
                     />
                     <span className="text-white text-sm">
-                      {selectedTicket.createdByName.split(" ")[0]}
+                      {
+                        (selectedTicket.createdByName || "Usuário").split(
+                          " ",
+                        )[0]
+                      }
                     </span>
                   </div>
                 </div>
@@ -717,7 +736,7 @@ export function TicketsClient({
                           className="w-6 h-6 rounded-full"
                         />
                         <span className="text-white text-sm">
-                          {assignee.name.split(" ")[0]}
+                          {(assignee.name || "Usuário").split(" ")[0]}
                         </span>
                       </div>
                     ) : (

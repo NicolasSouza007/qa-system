@@ -17,6 +17,10 @@ export function MemberProgress({
   onRemove: (id: string) => void;
 }) {
   const memberTasks = tasks.filter((t) => t.assignedTo === member.id);
+  const memberName =
+    typeof member.name === "string" && member.name.trim()
+      ? member.name.trim()
+      : "Usuário";
 
   return (
     <div className="bg-gray-900 border border-gray-500 rounded-xl p-3 sm:p-4">
@@ -24,12 +28,12 @@ export function MemberProgress({
         <div className="flex items-center gap-3">
           <img
             src={member.photo}
-            alt={member.name}
+            alt={memberName}
             className="w-8 h-8 rounded-full"
           />
           <div>
             <p className="text-white text-sm font-medium">
-              {member.name.split(" ")[0]}
+              {memberName.split(" ")[0]}
             </p>
             <p className="text-gray-200 text-xs">{memberTasks.length} tasks</p>
           </div>
