@@ -291,6 +291,30 @@ export default async function PainelPage() {
                 Ver tickets →
               </span>
             </Link>
+            {/* RELATORIOS */}
+            <Link
+              href="/relatorios"
+              className="group bg-gray-900 hover:bg-gray-800 border border-gray-800 hover:border-orange-500 rounded-2xl p-4 flex flex-col gap-3 duration-300"
+            >
+              <div className="w-10 h-10 bg-orange-500/20 rounded-xl flex items-center justify-center group-hover:bg-orange-500/30 duration-300">
+                <span className="text-2xl">📊</span>
+              </div>
+
+              <div>
+                <h2 className="text-white font-semibold text-lg mb-1 group-hover:text-orange-300 duration-300">
+                  Relatórios
+                </h2>
+
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  Analise chamados, categorias, prioridades e desempenho da
+                  equipe.
+                </p>
+              </div>
+
+              <span className="text-orange-400 text-sm font-medium mt-auto">
+                Ver relatórios →
+              </span>
+            </Link>
           </div>
         </div>
 

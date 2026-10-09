@@ -17,6 +17,7 @@
     "cloudinary": "^2.10.0",
     "firebase": "^12.14.0",
     "firebase-admin": "^13.10.0",
+    "lucide-react": "^1.54.0",
     "next": "16.2.6",
     "next-auth": "^4.24.14",
     "nodemailer": "^7.0.13",

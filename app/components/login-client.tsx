@@ -18,6 +18,7 @@ export function LoginClient() {
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+
     if (!form.code || !form.email || !form.password) {
       setError("Preencha todos os campos");
       return;
@@ -27,51 +28,115 @@ export function LoginClient() {
     setError("");
 
     try {
-      // 1. valida código do workspace e obtém custom token
-      const res = await fetch("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: form.email,
-          password: form.password,
-          workspaceCode: form.code,
-        }),
-      });
+      /*
+       * ============================================================
+       * 1. AUTENTICAR E-MAIL + SENHA NO FIREBASE
+       * ============================================================
+       */
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Erro ao fazer login");
-        setLoading(false);
-        return;
-      }
-
-      // 2. autentica no Firebase Auth com e-mail e senha
       const { signInWithEmailAndPassword, getIdToken } =
         await import("firebase/auth");
+
       const userCred = await signInWithEmailAndPassword(
         auth,
         form.email,
         form.password,
       );
 
-      // 3. pega o ID token do Firebase para passar ao NextAuth
+      /*
+       * ============================================================
+       * 2. PEGAR ID TOKEN DO USUÁRIO AUTENTICADO
+       * ============================================================
+       */
+
       const idToken = await getIdToken(userCred.user);
 
-      // 4. cria sessão NextAuth
+      /*
+       * ============================================================
+       * 3. VALIDAR SE O USUÁRIO PERTENCE AO WORKSPACE
+       * ============================================================
+       */
+
+      const res = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          idToken,
+          workspaceCode: form.code,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Seu usuário não possui acesso a esta conta.");
+
+        setLoading(false);
+
+        /*
+         * Opcional:
+         * encerra a autenticação Firebase caso o workspace
+         * não seja autorizado.
+         */
+
+        const { signOut } = await import("firebase/auth");
+
+        await signOut(auth);
+
+        return;
+      }
+
+      /*
+       * ============================================================
+       * 4. CRIAR SESSÃO NEXTAUTH
+       * ============================================================
+       */
+
       const result = await signIn("credentials", {
         token: idToken,
         redirect: false,
       });
 
       if (result?.error) {
-        setError("Erro ao criar sessão");
+        setError("Erro ao criar sessão.");
+
         setLoading(false);
+
+        const { signOut } = await import("firebase/auth");
+
+        await signOut(auth);
+
         return;
       }
 
+      /*
+       * ============================================================
+       * 5. LOGIN CONCLUÍDO
+       * ============================================================
+       */
+
       window.location.href = "/painel";
     } catch (err: any) {
-      setError(err?.message ?? "Erro ao fazer login");
+      console.error("Erro no login:", err);
+
+      /*
+       * Erros comuns do Firebase
+       */
+
+      if (
+        err?.code === "auth/invalid-credential" ||
+        err?.code === "auth/wrong-password" ||
+        err?.code === "auth/user-not-found"
+      ) {
+        setError("E-mail ou senha incorretos.");
+      } else if (err?.code === "auth/too-many-requests") {
+        setError("Muitas tentativas de login. Aguarde alguns minutos.");
+      } else {
+        setError(err?.message ?? "Não foi possível realizar o login.");
+      }
+
       setLoading(false);
     }
   }
